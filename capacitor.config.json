@@ -1,0 +1,13 @@
+{
+  "appId": "com.cloudsync.app",
+  "appName": "CloudSync",
+  "webDir": "dist",
+  "plugins": {
+    "SplashScreen": {
+      "launchAutoHide": true,
+      "launchShowDuration": 0,
+      "backgroundColor": "#06101a",
+      "showSpinner": false
+    }
+  }
+}

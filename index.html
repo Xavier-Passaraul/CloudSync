@@ -1,0 +1,38 @@
+
+  <!DOCTYPE html>
+  <html lang="es">
+    <head>
+      <meta charset="UTF-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <title>CloudSync</title>
+      <style>html, body { height: 100%; margin: 0; } #root { height: 100%; }</style>
+      <link rel="manifest" href="/manifest.json" />
+<meta name="theme-color" content="#06101a" />
+    </head>
+
+    <body>
+      <div id="splash-overlay" style="position:fixed;inset:0;z-index:9999;background:#06101a;transition:opacity 0.6s ease;">
+  <iframe src="/SplashScreen.html" style="width:100%;height:100%;border:none;"></iframe>
+</div>
+
+<script>
+  function hideSplash() {
+    const el = document.getElementById('splash-overlay');
+    if (!el) return;
+    el.style.opacity = '0';
+    setTimeout(() => el.remove(), 650);
+  }
+
+  // Se oculta a los 5 segundos pase lo que pase
+  setTimeout(hideSplash, 5000);
+
+  // También se oculta cuando la app termina de cargar
+  window.addEventListener('load', () => {
+    setTimeout(hideSplash, 4800);
+  });
+</script>
+      <div id="root"></div>
+      <script type="module" src="/src/main.tsx"></script>
+    </body>
+  </html>
+  

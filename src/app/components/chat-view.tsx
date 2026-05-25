@@ -3,7 +3,8 @@ import { api } from '../../utils/supabase';
 import { motion, AnimatePresence } from 'motion/react';
 import { useDropzone } from 'react-dropzone';
 import Editor from '@monaco-editor/react';
-import { ArrowLeft, Send, Paperclip, Trash2, Copy, Download, File, Image as ImageIcon, Code2, X } from 'lucide-react';
+import { ArrowLeft, Send, Paperclip, Trash2, Copy, Download, File, Image as ImageIcon, Code2, X, Share2 } from 'lucide-react';
+import { Share } from '@capacitor/share';
 import { toast } from 'sonner';
 import { ChatItem } from './chats';
 
@@ -167,13 +168,39 @@ export function ChatView({ token, chat, onBack }: ChatViewProps) {
         content: msg.content,
         visible: true,
       });
-    }, 500);
+    }, 300);
   };
 
   const handleLongPressEnd = () => {
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
+    }
+  };
+
+
+  const handleShare = async (content?: string, fileUrl?: string, fileName?: string) => {
+    try {
+      const canShare = await Share.canShare();
+      if (canShare.value) {
+        await Share.share({
+          title: 'CloudSync',
+          text: content || fileName || '',
+          url: fileUrl,
+          dialogTitle: 'Compartir desde CloudSync',
+        });
+      } else {
+        // Fallback web: copiar al portapapeles
+        if (content) {
+          navigator.clipboard.writeText(content);
+          toast.success('Copiado al portapapeles');
+        } else if (fileUrl) {
+          navigator.clipboard.writeText(fileUrl);
+          toast.success('URL copiada al portapapeles');
+        }
+      }
+    } catch (error) {
+      console.error('Error sharing:', error);
     }
   };
 
@@ -402,6 +429,22 @@ export function ChatView({ token, chat, onBack }: ChatViewProps) {
                 </button>
 
                 <button
+                  onClick={() => {
+                    handleShare(contextMenu.content);
+                    setContextMenu(null);
+                  }}
+                  className="w-full flex items-center gap-4 px-4 py-4 rounded-xl hover:bg-accent transition-all text-left"
+                >
+                  <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
+                    <Share2 className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="font-medium">Compartir</p>
+                    <p className="text-xs text-muted-foreground">Compartir con otras apps</p>
+                  </div>
+                </button>
+
+                <button
                   onClick={() => setContextMenu(null)}
                   className="w-full flex items-center gap-4 px-4 py-4 rounded-xl hover:bg-accent transition-all text-left"
                 >
@@ -465,61 +508,63 @@ export function ChatView({ token, chat, onBack }: ChatViewProps) {
 
       <div className="p-6 border-t border-border bg-card">
         <form onSubmit={handleSendText} className="flex gap-3">
-          <button
-            type="button"
-            onClick={open}
-            disabled={sending}
-            className="px-4 py-3 bg-accent text-accent-foreground rounded-xl hover:opacity-90 transition-all disabled:opacity-50"
-          >
-            <Paperclip className="w-5 h-5" />
-          </button>
+  {chat.type !== 'general' && (
+    <button
+      type="button"
+      onClick={open}
+      disabled={sending}
+      className="px-4 py-3 bg-accent text-accent-foreground rounded-xl hover:opacity-90 transition-all disabled:opacity-50"
+    >
+      <Paperclip className="w-5 h-5" />
+    </button>
+  )}
 
-          <div className="flex-1 relative">
-            {isCodeMode && chat.type !== 'general' ? (
-              <div className="border border-border rounded-xl overflow-hidden">
-                <Editor
-                  height="120px"
-                  defaultLanguage={language}
-                  value={newMessage}
-                  onChange={(value) => setNewMessage(value || '')}
-                  theme="vs-dark"
-                  options={{
-                    minimap: { enabled: false },
-                    scrollBeyondLastLine: false,
-                    fontSize: 14,
-                    lineNumbers: 'off',
-                    folding: false,
-                    automaticLayout: true,
-                    wordWrap: 'on',
-                    padding: { top: 12, bottom: 12 },
-                  }}
-                />
-              </div>
-            ) : (
-              <textarea
-                ref={textareaRef}
-                value={newMessage}
-                onChange={handleInput}
-                onKeyDown={handleKeyDown}
-                placeholder="Escribe un mensaje... (Enter para enviar, Shift+Enter para nueva línea)"
-                className="w-full px-4 py-3 bg-input-background border border-border rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none resize-none min-h-[50px] max-h-[200px]"
-                rows={1}
-              />
-            )}
-          </div>
+  <div className="flex-1 relative">
+    {isCodeMode && chat.type !== 'general' ? (
+      <div className="border border-border rounded-xl overflow-hidden">
+        <Editor
+          height="120px"
+          defaultLanguage={language}
+          value={newMessage}
+          onChange={(value) => setNewMessage(value || '')}
+          theme="vs-dark"
+          options={{
+            minimap: { enabled: false },
+            scrollBeyondLastLine: false,
+            fontSize: 14,
+            lineNumbers: 'off',
+            folding: false,
+            automaticLayout: true,
+            wordWrap: 'on',
+            padding: { top: 12, bottom: 12 },
+          }}
+        />
+      </div>
+    ) : (
+      <textarea
+        ref={textareaRef}
+        value={newMessage}
+        onChange={handleInput}
+        onKeyDown={handleKeyDown}
+        placeholder="Escribe un mensaje... (Enter para enviar, Shift+Enter para nueva línea)"
+        className="w-full px-4 py-3 bg-input-background border border-border rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none resize-none min-h-[50px] max-h-[200px]"
+        rows={1}
+      />
+    )}
+  </div>
 
-          <button
-            type="submit"
-            disabled={!newMessage.trim() || sending}
-            className="px-6 py-3 bg-primary text-primary-foreground rounded-xl font-medium hover:opacity-90 transition-all disabled:opacity-50 flex items-center gap-2"
-          >
-            {sending ? (
-              <div className="w-5 h-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
-            ) : (
-              <Send className="w-5 h-5" />
-            )}
-          </button>
-        </form>
+  <button
+    type="submit"
+    disabled={!newMessage.trim() || sending}
+    className="px-6 py-3 bg-primary text-primary-foreground rounded-xl font-medium hover:opacity-90 transition-all disabled:opacity-50 flex items-center gap-2"
+  >
+    {sending ? (
+      <div className="w-5 h-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+    ) : (
+      <Send className="w-5 h-5" />
+    )}
+  </button>
+</form>
       </div>
     </div>
   );

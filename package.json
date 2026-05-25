@@ -8,8 +8,12 @@
     "dev": "vite"
   },
   "dependencies": {
+    "@capacitor/app": "^8.1.0",
     "@capacitor/cli": "^8.3.4",
     "@capacitor/core": "^8.3.4",
+    "@capacitor/filesystem": "^8.1.2",
+    "@capacitor/push-notifications": "^8.1.1",
+    "@capacitor/share": "^8.0.1",
     "@capacitor/splash-screen": "^8.0.1",
     "@emotion/react": "11.14.0",
     "@emotion/styled": "11.14.1",
@@ -49,6 +53,7 @@
     "clsx": "2.1.1",
     "cmdk": "1.1.1",
     "date-fns": "3.6.0",
+    "devicons": "^2.0.1",
     "embla-carousel-react": "8.6.0",
     "input-otp": "1.4.2",
     "lucide-react": "0.487.0",
@@ -75,6 +80,7 @@
     "@capacitor/android": "^8.3.4",
     "@tailwindcss/vite": "4.1.12",
     "@vitejs/plugin-react": "4.7.0",
+    "supabase": "^2.101.0",
     "tailwindcss": "4.1.12",
     "vite": "6.3.5"
   },

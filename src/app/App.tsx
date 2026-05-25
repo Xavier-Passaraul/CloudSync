@@ -11,6 +11,8 @@ import { Profile } from './components/profile';
 import { CreateFolderModal } from './components/create-folder-modal';
 import { CreateChatModal } from './components/create-chat-modal';
 import { supabase, api } from '../utils/supabase';
+import { useBackButton } from '../hooks/useBackButton';
+import { usePushNotifications } from '../hooks/usePushNotifications';
 
 import type { FolderItem } from './components/folders';
 import type { ChatItem } from './components/chats';
@@ -116,6 +118,8 @@ function Dashboard({ token, user, setUser, onLogout, darkMode, toggleDarkMode }:
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  useBackButton();
+  usePushNotifications(user?.id || null);
 
   useEffect(() => {
     if ('Notification' in window) {
@@ -269,8 +273,8 @@ function Dashboard({ token, user, setUser, onLogout, darkMode, toggleDarkMode }:
 
             <motion.div
               initial={{ opacity: 0, x: -300 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -300 }}
+              animate={{ opacity: 1, x: 0, transition: { duration: 0.22, ease: [0.25, 0.46, 0.45, 0.94] } }}
+              exit={{ opacity: 0, x: -300, transition: { duration: 0.18, ease: [0.55, 0.06, 0.68, 0.19] } }}
               className="fixed top-0 left-0 h-full w-80 bg-card border-r border-border shadow-2xl z-50 flex flex-col"
             >
               <div className="p-6 border-b border-border">

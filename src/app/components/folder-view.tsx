@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react';
 import { api } from '../../utils/supabase';
 import { motion, AnimatePresence } from 'motion/react';
 import { useDropzone } from 'react-dropzone';
-import { ArrowLeft, Upload, File, FileText, Image as ImageIcon, Video, Music, Trash2, Download, Plus } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
+import { Filesystem, Directory } from '@capacitor/filesystem';
+import { ArrowLeft, Upload, File, FileText, Image as ImageIcon, Video, Music, Trash2, Download, Plus, Grid, List } from 'lucide-react';
 import { toast } from 'sonner';
 import { FolderItem } from './folders';
 
@@ -19,6 +21,11 @@ interface FileItem {
   size: number;
   type: string;
   createdAt: string;
+}
+
+interface UploadProgress {
+  fileName: string;
+  progress: number;
 }
 
 const acceptedFileTypes: { [key: string]: { [key: string]: string[] } } = {
@@ -46,10 +53,28 @@ const acceptedFileTypes: { [key: string]: { [key: string]: string[] } } = {
   },
 };
 
+// Íconos grandes por tipo de archivo
+function FileTypeIcon({ type, name, className = '' }: { type: string; name: string; className?: string }) {
+  const ext = name.split('.').pop()?.toLowerCase() || '';
+
+  if (type.startsWith('image/')) return <ImageIcon className={`text-green-500 ${className}`} />;
+  if (type.startsWith('video/')) return <Video className={`text-purple-500 ${className}`} />;
+  if (type.startsWith('audio/')) return <Music className={`text-pink-500 ${className}`} />;
+  if (type.includes('pdf')) return <FileText className={`text-red-500 ${className}`} />;
+  if (['doc','docx'].includes(ext)) return <FileText className={`text-blue-500 ${className}`} />;
+  if (['xls','xlsx'].includes(ext)) return <FileText className={`text-green-600 ${className}`} />;
+  if (['zip','rar','7z'].includes(ext)) return <File className={`text-yellow-500 ${className}`} />;
+  if (ext === 'apk') return <File className={`text-orange-500 ${className}`} />;
+  return <File className={`text-muted-foreground ${className}`} />;
+}
+
 export function FolderView({ token, folder, onBack }: FolderViewProps) {
   const [files, setFiles] = useState<FileItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   useEffect(() => {
     loadFiles();
@@ -71,21 +96,46 @@ export function FolderView({ token, folder, onBack }: FolderViewProps) {
 
   const handleUpload = async (acceptedFiles: File[]) => {
     if (acceptedFiles.length === 0) return;
-
     setUploading(true);
+
     for (const file of acceptedFiles) {
       try {
-        const reader = new FileReader();
-        reader.onloadend = async () => {
-          const base64 = reader.result as string;
-          await api.uploadFile(token, folder.id, file.name, base64, file.size, file.type);
-          toast.success(`${file.name} subido correctamente`);
-          await loadFiles();
-        };
-        reader.readAsDataURL(file);
+        setUploadProgress({ fileName: file.name, progress: 0 });
+
+        await new Promise<void>((resolve, reject) => {
+          const reader = new FileReader();
+
+          // Simular progreso de lectura
+          reader.onprogress = (e) => {
+            if (e.lengthComputable) {
+              const pct = Math.round((e.loaded / e.total) * 60);
+              setUploadProgress({ fileName: file.name, progress: pct });
+            }
+          };
+
+          reader.onloadend = async () => {
+            try {
+              setUploadProgress({ fileName: file.name, progress: 70 });
+              const base64 = reader.result as string;
+              await api.uploadFile(token, folder.id, file.name, base64, file.size, file.type);
+              setUploadProgress({ fileName: file.name, progress: 100 });
+              setTimeout(() => setUploadProgress(null), 600);
+              toast.success(`${file.name} subido correctamente`);
+              await loadFiles();
+              resolve();
+            } catch (err) {
+              reject(err);
+            }
+          };
+
+          reader.onerror = () => reject(reader.error);
+          reader.readAsDataURL(file);
+        });
+
       } catch (error) {
         console.error('Error uploading file:', error);
         toast.error(`Error al subir ${file.name}`);
+        setUploadProgress(null);
       }
     }
     setUploading(false);
@@ -109,35 +159,62 @@ export function FolderView({ token, folder, onBack }: FolderViewProps) {
     }
   };
 
-  // Descarga real compatible con móvil y APK
+  // Descarga con detección de plataforma
   const handleDownload = async (file: FileItem) => {
-    try {
-      toast.loading(`Descargando ${file.name}...`);
-      const response = await fetch(file.url);
-      const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
+    setDownloadingId(file.id);
+    const platform = Capacitor.getPlatform();
 
-      const a = document.createElement('a');
-      a.href = blobUrl;
-      a.download = file.name;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(blobUrl);
-      toast.dismiss();
-      toast.success(`${file.name} descargado`);
+    try {
+      if (platform === 'android' || platform === 'ios') {
+        // Móvil: usar Filesystem de Capacitor
+        toast.loading(`Descargando ${file.name}...`);
+
+        const response = await fetch(file.url);
+        const blob = await response.blob();
+
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const result = reader.result as string;
+            resolve(result.split(',')[1]);
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+
+        await Filesystem.writeFile({
+          path: file.name,
+          data: base64,
+          directory: Directory.Documents,
+          recursive: true,
+        });
+
+        toast.dismiss();
+        toast.success(`${file.name} guardado en Documentos`);
+      } else {
+        // Web: crear blob URL
+        toast.loading(`Descargando ${file.name}...`);
+        const response = await fetch(file.url);
+        const blob = await response.blob();
+        const blobUrl = URL.createObjectURL(blob);
+
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = file.name;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(blobUrl);
+        toast.dismiss();
+        toast.success(`${file.name} descargado`);
+      }
     } catch (error) {
+      console.error('Error downloading:', error);
       toast.dismiss();
       toast.error('Error al descargar el archivo');
+    } finally {
+      setDownloadingId(null);
     }
-  };
-
-  const getFileIcon = (type: string) => {
-    if (type.startsWith('image/')) return <ImageIcon className="w-6 h-6" />;
-    if (type.startsWith('video/')) return <Video className="w-6 h-6" />;
-    if (type.startsWith('audio/')) return <Music className="w-6 h-6" />;
-    if (type.includes('pdf') || type.includes('text')) return <FileText className="w-6 h-6" />;
-    return <File className="w-6 h-6" />;
   };
 
   const formatFileSize = (bytes: number) => {
@@ -163,19 +240,32 @@ export function FolderView({ token, folder, onBack }: FolderViewProps) {
         </motion.div>
       )}
 
+      {/* Header */}
       <div className="p-6 border-b border-border">
         <div className="flex items-center gap-4 mb-4">
-          <button
-            onClick={onBack}
-            className="p-2 hover:bg-accent rounded-xl transition-colors"
-          >
+          <button onClick={onBack} className="p-2 hover:bg-accent rounded-xl transition-colors">
             <ArrowLeft className="w-6 h-6" />
           </button>
-          <div>
+          <div className="flex-1">
             <h2 className="text-2xl font-bold">{folder.name}</h2>
             <p className="text-sm text-muted-foreground">
               {files.length} archivo{files.length !== 1 ? 's' : ''}
             </p>
+          </div>
+          {/* Toggle vista */}
+          <div className="flex gap-1 bg-accent rounded-xl p-1">
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-card shadow-sm' : ''}`}
+            >
+              <Grid className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className={`p-2 rounded-lg transition-all ${viewMode === 'list' ? 'bg-card shadow-sm' : ''}`}
+            >
+              <List className="w-4 h-4" />
+            </button>
           </div>
         </div>
 
@@ -196,8 +286,34 @@ export function FolderView({ token, folder, onBack }: FolderViewProps) {
             </>
           )}
         </button>
+
+        {/* Barra de progreso */}
+        <AnimatePresence>
+          {uploadProgress && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              className="mt-3"
+            >
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-xs text-muted-foreground truncate max-w-[70%]">{uploadProgress.fileName}</p>
+                <p className="text-xs font-medium text-primary">{uploadProgress.progress}%</p>
+              </div>
+              <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+                <motion.div
+                  className="h-full bg-primary rounded-full"
+                  initial={{ width: '0%' }}
+                  animate={{ width: `${uploadProgress.progress}%` }}
+                  transition={{ duration: 0.3 }}
+                />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
+      {/* Contenido */}
       <div className="flex-1 overflow-y-auto p-6">
         {loading ? (
           <div className="flex items-center justify-center h-64">
@@ -213,8 +329,9 @@ export function FolderView({ token, folder, onBack }: FolderViewProps) {
               Arrastra archivos aquí o haz clic en "Subir archivo"
             </p>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        ) : viewMode === 'grid' ? (
+          // Vista grilla con miniaturas
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
             <AnimatePresence>
               {files.map((file) => (
                 <motion.div
@@ -222,39 +339,90 @@ export function FolderView({ token, folder, onBack }: FolderViewProps) {
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.95 }}
-                  className="bg-card border border-border rounded-xl p-4 hover:shadow-lg transition-shadow group"
+                  className="bg-card border border-border rounded-xl overflow-hidden hover:shadow-lg transition-shadow group"
                 >
-                  <div className="flex items-start gap-3 mb-4">
-                    <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center text-primary flex-shrink-0">
-                      {getFileIcon(file.type)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-medium truncate mb-1">{file.name}</h3>
-                      <p className="text-sm text-muted-foreground">
-                        {formatFileSize(file.size)}
-                      </p>
+                  {/* Miniatura */}
+                  <div className="aspect-square bg-muted/50 flex items-center justify-center relative overflow-hidden">
+                    {file.type.startsWith('image/') ? (
+                      <img
+                        src={file.url}
+                        alt={file.name}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <FileTypeIcon type={file.type} name={file.name} className="w-12 h-12" />
+                    )}
+                    {/* Overlay acciones */}
+                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                      <button
+                        onClick={() => handleDownload(file)}
+                        disabled={downloadingId === file.id}
+                        className="p-2 bg-white/20 backdrop-blur-sm rounded-lg hover:bg-white/30 transition-all"
+                      >
+                        {downloadingId === file.id ? (
+                          <div className="w-4 h-4 border-2 border-white/50 border-t-white rounded-full animate-spin" />
+                        ) : (
+                          <Download className="w-4 h-4 text-white" />
+                        )}
+                      </button>
+                      <button
+                        onClick={() => handleDelete(file.id, file.name)}
+                        className="p-2 bg-red-500/70 backdrop-blur-sm rounded-lg hover:bg-red-500/90 transition-all"
+                      >
+                        <Trash2 className="w-4 h-4 text-white" />
+                      </button>
                     </div>
                   </div>
-
-                  <p className="text-xs text-muted-foreground mb-3">
-                    {new Date(file.createdAt).toLocaleDateString('es-ES', {
-                      day: 'numeric',
-                      month: 'short',
-                      year: 'numeric'
-                    })}
-                  </p>
-
-                  <div className="flex gap-2">
+                  {/* Nombre */}
+                  <div className="p-2">
+                    <p className="text-xs font-medium truncate">{file.name}</p>
+                    <p className="text-xs text-muted-foreground">{formatFileSize(file.size)}</p>
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
+        ) : (
+          // Vista lista
+          <div className="space-y-2">
+            <AnimatePresence>
+              {files.map((file) => (
+                <motion.div
+                  key={file.id}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 8 }}
+                  className="bg-card border border-border rounded-xl p-4 hover:shadow-md transition-shadow flex items-center gap-4 group"
+                >
+                  <div className="w-10 h-10 bg-muted/50 rounded-lg flex items-center justify-center flex-shrink-0">
+                    {file.type.startsWith('image/') ? (
+                      <img src={file.url} alt={file.name} className="w-10 h-10 object-cover rounded-lg" loading="lazy" />
+                    ) : (
+                      <FileTypeIcon type={file.type} name={file.name} className="w-5 h-5" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate text-sm">{file.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatFileSize(file.size)} · {new Date(file.createdAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </p>
+                  </div>
+                  <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
                       onClick={() => handleDownload(file)}
-                      className="flex-1 bg-accent text-accent-foreground py-2 rounded-lg font-medium hover:opacity-90 transition-all flex items-center justify-center gap-2 text-sm"
+                      disabled={downloadingId === file.id}
+                      className="p-2 hover:bg-accent rounded-lg transition-all"
                     >
-                      <Download className="w-4 h-4" />
-                      Descargar
+                      {downloadingId === file.id ? (
+                        <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                      ) : (
+                        <Download className="w-4 h-4" />
+                      )}
                     </button>
                     <button
                       onClick={() => handleDelete(file.id, file.name)}
-                      className="px-3 py-2 bg-destructive/10 text-destructive rounded-lg hover:bg-destructive/20 transition-all"
+                      className="p-2 hover:bg-destructive/10 text-destructive rounded-lg transition-all"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>

@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { api } from '../../utils/supabase';
 import { motion, AnimatePresence } from 'motion/react';
-import { MessageSquare, Trash2 } from 'lucide-react';
+import { Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface ChatsProps {
@@ -35,32 +35,22 @@ const chatIcons: { [key: string]: string } = {
   other: '📝',
 };
 
-const chatColors: { [key: string]: string } = {
-  general: 'bg-gray-500',
-  html: 'bg-orange-600',
-  css: 'bg-blue-600',
-  javascript: 'bg-yellow-500',
-  typescript: 'bg-blue-700',
-  react: 'bg-cyan-500',
-  nodejs: 'bg-green-600',
-  python: 'bg-blue-500',
-  php: 'bg-purple-600',
-  java: 'bg-red-600',
-  csharp: 'bg-purple-700',
-  cpp: 'bg-blue-800',
-  sql: 'bg-orange-500',
-  json: 'bg-green-500',
-  bash: 'bg-gray-700',
-  other: 'bg-gray-600',
-};
-
 export function Chats({ token, onOpenChat }: ChatsProps) {
   const [chats, setChats] = useState<ChatItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [messageCounts, setMessageCounts] = useState<{ [key: string]: number }>({});
+  const [chatToDelete, setChatToDelete] = useState<ChatItem | null>(null);
+  const [contextMenu, setContextMenu] = useState<ChatItem | null>(null);
+  const longPressTimers = useRef<{ [key: string]: ReturnType<typeof setTimeout> }>({});
 
   useEffect(() => {
     loadChats();
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = () => setContextMenu(null);
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
   }, []);
 
   const loadChats = async () => {
@@ -71,7 +61,6 @@ export function Chats({ token, onOpenChat }: ChatsProps) {
       );
       setChats(sortedChats);
 
-      // Load message counts for each chat
       const counts: { [key: string]: number } = {};
       for (const chat of sortedChats) {
         try {
@@ -90,20 +79,35 @@ export function Chats({ token, onOpenChat }: ChatsProps) {
     }
   };
 
-  const handleDelete = async (e: React.MouseEvent, chatId: string, chatName: string) => {
-    e.stopPropagation();
-
-    if (!confirm(`¿Estás seguro de eliminar "${chatName}"? Se eliminarán todos los mensajes.`)) {
-      return;
-    }
-
+  const handleDelete = async (chat: ChatItem) => {
     try {
-      await api.deleteChat(token, chatId);
-      setChats(chats.filter(c => c.id !== chatId));
-      toast.success(`${chatName} eliminado`);
+      await api.deleteChat(token, chat.id);
+      setChats(chats.filter(c => c.id !== chat.id));
+      toast.success(`${chat.name} eliminado`);
+      setChatToDelete(null);
+      setContextMenu(null);
     } catch (error) {
       console.error('Error deleting chat:', error);
       toast.error('Error al eliminar chat');
+    }
+  };
+
+  const handleLongPressStart = (e: React.TouchEvent | React.MouseEvent, chat: ChatItem) => {
+    longPressTimers.current[chat.id] = setTimeout(() => {
+      setContextMenu(chat);
+    }, 300);
+  };
+
+  const handleLongPressEnd = (chatId: string) => {
+    if (longPressTimers.current[chatId]) {
+      clearTimeout(longPressTimers.current[chatId]);
+      delete longPressTimers.current[chatId];
+    }
+  };
+
+  const handleClick = (chat: ChatItem) => {
+    if (!contextMenu) {
+      onOpenChat(chat);
     }
   };
 
@@ -130,52 +134,171 @@ export function Chats({ token, onOpenChat }: ChatsProps) {
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-      <AnimatePresence>
-        {chats.map((chat) => {
-          const icon = chatIcons[chat.type] || '💬';
-          const colorClass = chatColors[chat.type] || 'bg-gray-500';
+    <>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <AnimatePresence>
+          {chats.map((chat) => {
+            const icon = chatIcons[chat.type] || '💬';
 
-          return (
-            <motion.div
-              key={chat.id}
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              whileHover={{ scale: 1.02 }}
-              onClick={() => onOpenChat(chat)}
-              className="bg-card border border-border rounded-2xl p-6 cursor-pointer hover:shadow-xl transition-all group"
-            >
-              <div className="flex items-start justify-between mb-4">
-                <div className={`w-14 h-14 ${colorClass} rounded-2xl flex items-center justify-center text-white text-2xl`}>
-                  {icon}
+            return (
+              <motion.div
+                key={chat.id}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                whileHover={{ scale: 1.02 }}
+                onClick={() => handleClick(chat)}
+                onTouchStart={(e) => handleLongPressStart(e, chat)}
+                onTouchEnd={() => handleLongPressEnd(chat.id)}
+                onTouchMove={() => handleLongPressEnd(chat.id)}
+                onMouseDown={(e) => handleLongPressStart(e, chat)}
+                onMouseUp={() => handleLongPressEnd(chat.id)}
+                onMouseLeave={() => handleLongPressEnd(chat.id)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  setContextMenu(chat);
+                }}
+                className={`bg-card border rounded-2xl p-6 cursor-pointer hover:shadow-xl transition-all group select-none ${
+                  contextMenu?.id === chat.id ? 'border-primary shadow-md' : 'border-border'
+                }`}
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <div className="w-14 h-14 bg-muted rounded-2xl flex items-center justify-center text-foreground text-2xl">
+                    {icon}
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setChatToDelete(chat);
+                    }}
+                    className="opacity-0 group-hover:opacity-100 p-2 hover:bg-destructive/10 text-destructive rounded-lg transition-all"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
+
+                <h3 className="font-semibold text-lg mb-1 truncate">{chat.name}</h3>
+                <p className="text-sm text-muted-foreground mb-3 capitalize">{chat.type}</p>
+
+                <div className="flex items-center justify-between pt-3 border-t border-border">
+                  <span className="text-xs text-muted-foreground">
+                    {messageCounts[chat.id] || 0} mensaje{messageCounts[chat.id] !== 1 ? 's' : ''}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {new Date(chat.createdAt).toLocaleDateString('es-ES', {
+                      day: 'numeric',
+                      month: 'short'
+                    })}
+                  </span>
+                </div>
+              </motion.div>
+            );
+          })}
+        </AnimatePresence>
+      </div>
+
+      {/* Sheet long press */}
+      <AnimatePresence>
+        {contextMenu && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setContextMenu(null)}
+              className="fixed inset-0 bg-black/40 z-40 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, y: 40, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 40, scale: 0.95 }}
+              className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border rounded-t-3xl p-6 shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="w-10 h-1 bg-border rounded-full mx-auto mb-4" />
+              <p className="font-semibold text-center mb-6 truncate">{contextMenu.name}</p>
+
+              <div className="space-y-2">
                 <button
-                  onClick={(e) => handleDelete(e, chat.id, chat.name)}
-                  className="opacity-0 group-hover:opacity-100 p-2 hover:bg-destructive/10 text-destructive rounded-lg transition-all"
+                  onClick={() => {
+                    setChatToDelete(contextMenu);
+                    setContextMenu(null);
+                  }}
+                  className="w-full flex items-center gap-4 px-4 py-4 rounded-xl hover:bg-destructive/10 transition-all text-left"
                 >
-                  <Trash2 className="w-4 h-4" />
+                  <div className="w-10 h-10 bg-destructive/10 rounded-xl flex items-center justify-center">
+                    <Trash2 className="w-5 h-5 text-destructive" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-destructive">Eliminar chat</p>
+                    <p className="text-xs text-muted-foreground">Se eliminarán todos los mensajes</p>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => setContextMenu(null)}
+                  className="w-full flex items-center gap-4 px-4 py-4 rounded-xl hover:bg-accent transition-all text-left"
+                >
+                  <div className="w-10 h-10 bg-muted rounded-xl flex items-center justify-center">
+                    <X className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="font-medium">Cancelar</p>
+                  </div>
                 </button>
               </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
-              <h3 className="font-semibold text-lg mb-1 truncate">{chat.name}</h3>
-              <p className="text-sm text-muted-foreground mb-3 capitalize">{chat.type}</p>
-
-              <div className="flex items-center justify-between pt-3 border-t border-border">
-                <span className="text-xs text-muted-foreground">
-                  {messageCounts[chat.id] || 0} mensaje{messageCounts[chat.id] !== 1 ? 's' : ''}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {new Date(chat.createdAt).toLocaleDateString('es-ES', {
-                    day: 'numeric',
-                    month: 'short'
-                  })}
-                </span>
+      {/* Modal confirmar eliminación */}
+      <AnimatePresence>
+        {chatToDelete && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setChatToDelete(null)}
+              className="fixed inset-0 bg-black/50 z-50 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            >
+              <div
+                className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-sm p-6"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="w-14 h-14 bg-destructive/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Trash2 className="w-7 h-7 text-destructive" />
+                </div>
+                <h2 className="text-xl font-bold text-center mb-2">¿Eliminar chat?</h2>
+                <p className="text-center text-muted-foreground text-sm mb-6">
+                  Se eliminarán todos los mensajes de <span className="font-medium text-foreground">"{chatToDelete.name}"</span>. Esta acción no se puede deshacer.
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setChatToDelete(null)}
+                    className="flex-1 px-4 py-3 bg-accent text-accent-foreground rounded-xl font-medium hover:opacity-90 transition-all"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={() => handleDelete(chatToDelete)}
+                    className="flex-1 px-4 py-3 bg-destructive text-destructive-foreground rounded-xl font-medium hover:opacity-90 transition-all"
+                  >
+                    Eliminar
+                  </button>
+                </div>
               </div>
             </motion.div>
-          );
-        })}
+          </>
+        )}
       </AnimatePresence>
-    </div>
+    </>
   );
 }

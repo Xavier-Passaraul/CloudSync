@@ -34,23 +34,24 @@ const LangIcon = ({ type, className = '' }: { type: string; className?: string }
 };
 
 const chatTypes = [
-  { value: 'general', label: 'Chat común', color: 'bg-gray-500' },
-  { value: 'html', label: 'HTML', color: 'bg-orange-600' },
-  { value: 'css', label: 'CSS', color: 'bg-blue-600' },
-  { value: 'javascript', label: 'JavaScript', color: 'bg-yellow-400' },
-  { value: 'typescript', label: 'TypeScript', color: 'bg-blue-700' },
-  { value: 'react', label: 'React', color: 'bg-cyan-500' },
-  { value: 'nodejs', label: 'Node.js', color: 'bg-green-600' },
-  { value: 'python', label: 'Python', color: 'bg-blue-500' },
-  { value: 'php', label: 'PHP', color: 'bg-indigo-500' },
-  { value: 'java', label: 'Java', color: 'bg-orange-700' },
-  { value: 'csharp', label: 'C#', color: 'bg-green-700' },
-  { value: 'cpp', label: 'C++', color: 'bg-blue-800' },
-  { value: 'sql', label: 'SQL', color: 'bg-blue-400' },
-  { value: 'json', label: 'JSON', color: 'bg-gray-700' },
-  { value: 'bash', label: 'Bash', color: 'bg-green-800' },
-  { value: 'other', label: 'Otros', color: 'bg-gray-600' },
+  { value: 'general', label: 'Chat común', color: 'bg-zinc-800/60' },
+  { value: 'html', label: 'HTML', color: 'bg-zinc-800/60' },
+  { value: 'css', label: 'CSS', color: 'bg-zinc-800/60' },
+  { value: 'javascript', label: 'JavaScript', color: 'bg-zinc-800/60' },
+  { value: 'typescript', label: 'TypeScript', color: 'bg-zinc-800/60' },
+  { value: 'react', label: 'React', color: 'bg-zinc-800/60' },
+  { value: 'nodejs', label: 'Node.js', color: 'bg-zinc-800/60' },
+  { value: 'python', label: 'Python', color: 'bg-zinc-800/60' },
+  { value: 'php', label: 'PHP', color: 'bg-zinc-800/60' },
+  { value: 'java', label: 'Java', color: 'bg-zinc-800/60' },
+  { value: 'csharp', label: 'C#', color: 'bg-zinc-800/60' },
+  { value: 'cpp', label: 'C++', color: 'bg-zinc-800/60' },
+  { value: 'sql', label: 'SQL', color: 'bg-zinc-800/60' },
+  { value: 'json', label: 'JSON', color: 'bg-zinc-800/60' },
+  { value: 'bash', label: 'Bash', color: 'bg-zinc-800/60' },
+  { value: 'other', label: 'Otros', color: 'bg-zinc-800/60' },
 ];
+
 
 export function CreateChatModal({ isOpen, onClose, onCreateChat }: CreateChatModalProps) {
   const [name, setName] = useState('');

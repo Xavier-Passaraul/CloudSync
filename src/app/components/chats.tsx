@@ -1,3 +1,4 @@
+import React from 'react';
 import { useState, useEffect, useRef } from 'react';
 import { api } from '../../utils/supabase';
 import { motion, AnimatePresence } from 'motion/react';
@@ -16,23 +17,52 @@ export interface ChatItem {
   createdAt: string;
 }
 
-const chatIcons: { [key: string]: string } = {
-  general: '💬',
-  html: '🌐',
-  css: '🎨',
-  javascript: '📜',
-  typescript: '📘',
-  react: '⚛️',
-  nodejs: '🟢',
-  python: '🐍',
-  php: '🐘',
-  java: '☕',
-  csharp: '#️⃣',
-  cpp: '➕',
-  sql: '🗄️',
-  json: '📋',
-  bash: '💻',
-  other: '📝',
+const devIconMap: { [key: string]: string } = {
+  html: 'html5/html5-original.svg',
+  css: 'css3/css3-original.svg',
+  javascript: 'javascript/javascript-original.svg',
+  typescript: 'typescript/typescript-original.svg',
+  react: 'react/react-original.svg',
+  nodejs: 'nodejs/nodejs-original.svg',
+  python: 'python/python-original.svg',
+  php: 'php/php-original.svg',
+  java: 'java/java-original.svg',
+  csharp: 'csharp/csharp-original.svg',
+  cpp: 'cplusplus/cplusplus-original.svg',
+  sql: 'mysql/mysql-original.svg',
+  json: 'json/json-original.svg',
+  bash: 'bash/bash-plain.svg?v=2',
+
+};
+
+
+const LangIcon = ({ type }: { type: string }) => {
+  if (type === 'general') {
+    return (
+      <svg viewBox="0 0 24 24" fill="currentColor" className="w-7 h-7 text-foreground">
+        <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>
+      </svg>
+    );
+  }
+
+  if (devIconMap[type]) {
+    return (
+      <img
+        src={`https://cdn.jsdelivr.net/gh/devicons/devicon/icons/${devIconMap[type]}`}
+        alt={type}
+        className="w-8 h-8"
+        onError={(e) => {
+          (e.target as HTMLImageElement).style.display = 'none';
+        }}
+      />
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className="w-7 h-7 text-foreground">
+      <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/>
+    </svg>
+  );
 };
 
 export function Chats({ token, onOpenChat }: ChatsProps) {
@@ -137,63 +167,59 @@ export function Chats({ token, onOpenChat }: ChatsProps) {
     <>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         <AnimatePresence>
-          {chats.map((chat) => {
-            const icon = chatIcons[chat.type] || '💬';
-
-            return (
-              <motion.div
-                key={chat.id}
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                whileHover={{ scale: 1.02 }}
-                onClick={() => handleClick(chat)}
-                onTouchStart={(e) => handleLongPressStart(e, chat)}
-                onTouchEnd={() => handleLongPressEnd(chat.id)}
-                onTouchMove={() => handleLongPressEnd(chat.id)}
-                onMouseDown={(e) => handleLongPressStart(e, chat)}
-                onMouseUp={() => handleLongPressEnd(chat.id)}
-                onMouseLeave={() => handleLongPressEnd(chat.id)}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  setContextMenu(chat);
-                }}
-                className={`bg-card border rounded-2xl p-6 cursor-pointer hover:shadow-xl transition-all group select-none ${
-                  contextMenu?.id === chat.id ? 'border-primary shadow-md' : 'border-border'
-                }`}
-              >
-                <div className="flex items-start justify-between mb-4">
-                  <div className="w-14 h-14 bg-muted rounded-2xl flex items-center justify-center text-foreground text-2xl">
-                    {icon}
-                  </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setChatToDelete(chat);
-                    }}
-                    className="opacity-0 group-hover:opacity-100 p-2 hover:bg-destructive/10 text-destructive rounded-lg transition-all"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+          {chats.map((chat) => (
+            <motion.div
+              key={chat.id}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              whileHover={{ scale: 1.02 }}
+              onClick={() => handleClick(chat)}
+              onTouchStart={(e) => handleLongPressStart(e, chat)}
+              onTouchEnd={() => handleLongPressEnd(chat.id)}
+              onTouchMove={() => handleLongPressEnd(chat.id)}
+              onMouseDown={(e) => handleLongPressStart(e, chat)}
+              onMouseUp={() => handleLongPressEnd(chat.id)}
+              onMouseLeave={() => handleLongPressEnd(chat.id)}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                setContextMenu(chat);
+              }}
+              className={`bg-card border rounded-2xl p-6 cursor-pointer hover:shadow-xl transition-all group select-none ${
+                contextMenu?.id === chat.id ? 'border-primary shadow-md' : 'border-border'
+              }`}
+            >
+              <div className="flex items-start justify-between mb-4">
+                <div className="w-14 h-14 bg-zinc-800 rounded-2xl flex items-center justify-center">
+                  <LangIcon type={chat.type} />
                 </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setChatToDelete(chat);
+                  }}
+                  className="opacity-0 group-hover:opacity-100 p-2 hover:bg-destructive/10 text-destructive rounded-lg transition-all"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
 
-                <h3 className="font-semibold text-lg mb-1 truncate">{chat.name}</h3>
-                <p className="text-sm text-muted-foreground mb-3 capitalize">{chat.type}</p>
+              <h3 className="font-semibold text-lg mb-1 truncate">{chat.name}</h3>
+              <p className="text-sm text-muted-foreground mb-3 capitalize">{chat.type}</p>
 
-                <div className="flex items-center justify-between pt-3 border-t border-border">
-                  <span className="text-xs text-muted-foreground">
-                    {messageCounts[chat.id] || 0} mensaje{messageCounts[chat.id] !== 1 ? 's' : ''}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {new Date(chat.createdAt).toLocaleDateString('es-ES', {
-                      day: 'numeric',
-                      month: 'short'
-                    })}
-                  </span>
-                </div>
-              </motion.div>
-            );
-          })}
+              <div className="flex items-center justify-between pt-3 border-t border-border">
+                <span className="text-xs text-muted-foreground">
+                  {messageCounts[chat.id] || 0} mensaje{messageCounts[chat.id] !== 1 ? 's' : ''}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {new Date(chat.createdAt).toLocaleDateString('es-ES', {
+                    day: 'numeric',
+                    month: 'short'
+                  })}
+                </span>
+              </div>
+            </motion.div>
+          ))}
         </AnimatePresence>
       </div>
 

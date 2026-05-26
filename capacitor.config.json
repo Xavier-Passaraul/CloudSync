@@ -7,7 +7,18 @@
       "launchAutoHide": true,
       "launchShowDuration": 0,
       "backgroundColor": "#06101a",
-      "showSpinner": false
+      "showSpinner": false,
+      "androidSplashResourceName": "splash",
+      "splashFullScreen": true,
+      "splashImmersive": true
+    },
+    "PushNotifications": {
+      "presentationOptions": ["badge", "sound", "alert"]
+    },
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_icon_config_sample",
+      "iconColor": "#4db8c8",
+      "sound": "beep.wav"
     }
   }
 }

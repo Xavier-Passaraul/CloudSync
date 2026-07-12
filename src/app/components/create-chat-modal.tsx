@@ -33,29 +33,41 @@ const LangIcon = ({ type, className = '' }: { type: string; className?: string }
   return icons[type] || icons.other;
 };
 
-const chatTypes = [
-  { value: 'general', label: 'Chat común', color: 'bg-zinc-800/60' },
-  { value: 'html', label: 'HTML', color: 'bg-zinc-800/60' },
-  { value: 'css', label: 'CSS', color: 'bg-zinc-800/60' },
-  { value: 'javascript', label: 'JavaScript', color: 'bg-zinc-800/60' },
-  { value: 'typescript', label: 'TypeScript', color: 'bg-zinc-800/60' },
-  { value: 'react', label: 'React', color: 'bg-zinc-800/60' },
-  { value: 'nodejs', label: 'Node.js', color: 'bg-zinc-800/60' },
-  { value: 'python', label: 'Python', color: 'bg-zinc-800/60' },
-  { value: 'php', label: 'PHP', color: 'bg-zinc-800/60' },
-  { value: 'java', label: 'Java', color: 'bg-zinc-800/60' },
-  { value: 'csharp', label: 'C#', color: 'bg-zinc-800/60' },
-  { value: 'cpp', label: 'C++', color: 'bg-zinc-800/60' },
-  { value: 'sql', label: 'SQL', color: 'bg-zinc-800/60' },
-  { value: 'json', label: 'JSON', color: 'bg-zinc-800/60' },
-  { value: 'bash', label: 'Bash', color: 'bg-zinc-800/60' },
-  { value: 'other', label: 'Otros', color: 'bg-zinc-800/60' },
+const chatCategories = [
+  {
+    label: 'General',
+    types: [
+      { value: 'general', label: 'Chat común' },
+    ],
+  },
+  {
+    label: 'Programación',
+    collapsible: true,
+    types: [
+      { value: 'html',       label: 'HTML' },
+      { value: 'css',        label: 'CSS' },
+      { value: 'javascript', label: 'JavaScript' },
+      { value: 'typescript', label: 'TypeScript' },
+      { value: 'react',      label: 'React' },
+      { value: 'nodejs',     label: 'Node.js' },
+      { value: 'python',     label: 'Python' },
+      { value: 'php',        label: 'PHP' },
+      { value: 'java',       label: 'Java' },
+      { value: 'csharp',     label: 'C#' },
+      { value: 'cpp',        label: 'C++' },
+      { value: 'sql',        label: 'SQL' },
+      { value: 'json',       label: 'JSON' },
+      { value: 'bash',       label: 'Bash' },
+      { value: 'other',      label: 'Otros' },
+    ],
+  },
 ];
 
 
 export function CreateChatModal({ isOpen, onClose, onCreateChat }: CreateChatModalProps) {
   const [name, setName] = useState('');
   const [selectedType, setSelectedType] = useState('general');
+  const [programmingExpanded, setProgrammingExpanded] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -107,23 +119,57 @@ export function CreateChatModal({ isOpen, onClose, onCreateChat }: CreateChatMod
 
                 <div>
                   <label className="block text-sm font-medium mb-3">Tipo de chat</label>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {chatTypes.map((type) => (
-                      <button
-                        key={type.value}
-                        type="button"
-                        onClick={() => setSelectedType(type.value)}
-                        className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all hover:scale-[1.02] ${
-                          selectedType === type.value
-                            ? 'border-primary bg-primary/10'
-                            : 'border-border hover:border-primary/50'
-                        }`}
-                      >
-                        <div className={`w-10 h-10 ${type.color} rounded-xl flex items-center justify-center p-2`}>
-                          <LangIcon type={type.value} className="w-6 h-6" />
-                        </div>
-                        <span className="font-medium text-sm">{type.label}</span>
-                      </button>
+                  <div className="space-y-4">
+                    {chatCategories.map((cat) => (
+                      <div key={cat.label}>
+                        {cat.collapsible ? (
+                          <button
+                            type="button"
+                            onClick={() => setProgrammingExpanded(prev => !prev)}
+                            className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-muted/50 hover:bg-muted transition-colors mb-2"
+                          >
+                            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{cat.label}</span>
+                            <svg
+                              viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                              className={`w-4 h-4 text-muted-foreground transition-transform ${programmingExpanded ? 'rotate-180' : ''}`}
+                            >
+                              <path d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </button>
+                        ) : (
+                          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1 mb-2">{cat.label}</p>
+                        )}
+
+                        {/* Para categorías colapsables, mostrar solo si está expandida o si el tipo seleccionado está en ella */}
+                        {(!cat.collapsible || programmingExpanded || cat.types.some(t => t.value === selectedType)) && (
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                            {cat.types.map((type) => (
+                              <button
+                                key={type.value}
+                                type="button"
+                                onClick={() => setSelectedType(type.value)}
+                                className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all hover:scale-[1.02] ${
+                                  selectedType === type.value
+                                    ? 'border-primary bg-primary/10'
+                                    : 'border-border hover:border-primary/50'
+                                }`}
+                              >
+                                <div className="w-10 h-10 bg-zinc-800/60 rounded-xl flex items-center justify-center p-2">
+                                  <LangIcon type={type.value} className="w-6 h-6" />
+                                </div>
+                                <span className="font-medium text-sm">{type.label}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Si está colapsada y hay un tipo seleccionado dentro, mostrar solo ese */}
+                        {cat.collapsible && !programmingExpanded && cat.types.some(t => t.value === selectedType) && (
+                          <p className="text-xs text-muted-foreground px-1 mt-1">
+                            Seleccionado: <span className="text-foreground font-medium">{cat.types.find(t => t.value === selectedType)?.label}</span>
+                          </p>
+                        )}
+                      </div>
                     ))}
                   </div>
                 </div>

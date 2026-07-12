@@ -29,6 +29,8 @@ interface UploadProgress {
   progress: number;
 }
 
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB por archivo
+
 const acceptedFileTypes: { [key: string]: { [key: string]: string[] } } = {
   documents: {
     'application/pdf': ['.pdf'],
@@ -50,7 +52,11 @@ const acceptedFileTypes: { [key: string]: { [key: string]: string[] } } = {
     'video/webm': ['.webm'],
   },
   apk: {
+    // APK: múltiples tipos MIME según el navegador/SO
     'application/vnd.android.package-archive': ['.apk'],
+    'application/octet-stream': ['.apk'],
+    'application/x-apk': ['.apk'],
+    'application/zip': ['.apk'],
   },
 };
 
@@ -179,10 +185,29 @@ export function FolderView({ token, folder, onBack }: FolderViewProps) {
   };
 
   const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
-    onDrop: handleUpload,
-    accept: acceptedFileTypes[folder.type] || {},
+    onDrop: (accepted, rejected) => {
+      if (rejected.length > 0) {
+        rejected.forEach(({ file, errors }) => {
+          if (errors.some(e => e.code === 'file-too-large')) {
+            toast.error(`${file.name} supera el límite de 50 MB`);
+          } else {
+            toast.error(`${file.name}: tipo de archivo no permitido`);
+          }
+        });
+      }
+      // Para APK: react-dropzone a veces rechaza por MIME incorrecto → validar por extensión
+      const apkFiles = folder.type === 'apk'
+        ? rejected.filter(({ file }) => file.name.toLowerCase().endsWith('.apk')).map(r => r.file)
+        : [];
+      handleUpload([...accepted, ...apkFiles]);
+    },
+    accept: folder.type === 'apk' ? undefined : (acceptedFileTypes[folder.type] || {}),
+    maxSize: MAX_FILE_SIZE,
     noClick: true,
     noKeyboard: true,
+    validator: folder.type === 'apk'
+      ? (file) => file.name.toLowerCase().endsWith('.apk') ? null : { code: 'wrong-ext', message: 'Solo archivos .apk' }
+      : undefined,
   });
 
   const handleDelete = async (fileId: string, fileName: string) => {
@@ -333,14 +358,22 @@ export function FolderView({ token, folder, onBack }: FolderViewProps) {
           </div>
         </div>
 
-        <button onClick={open} disabled={uploading}
-          className="w-full sm:w-auto bg-primary text-primary-foreground px-6 py-3 rounded-xl font-medium hover:opacity-90 transition-all disabled:opacity-50 flex items-center gap-2 justify-center">
-          {uploading ? (
-            <><div className="w-5 h-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />Subiendo...</>
-          ) : (
-            <><Plus className="w-5 h-5" />Subir archivo</>
-          )}
-        </button>
+        <div className="flex items-center gap-3 mt-3">
+          <button onClick={open} disabled={uploading}
+            className="bg-primary text-primary-foreground px-6 py-3 rounded-xl font-medium hover:opacity-90 transition-all disabled:opacity-50 flex items-center gap-2 justify-center">
+            {uploading ? (
+              <><div className="w-5 h-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />Subiendo...</>
+            ) : (
+              <><Plus className="w-5 h-5" />Subir archivo</>
+            )}
+          </button>
+          <p className="text-xs text-muted-foreground">
+            {folder.type === 'documents' && 'PDF, DOCX, DOC, TXT, XLSX · máx. 50 MB'}
+            {folder.type === 'images' && 'JPG, PNG, WEBP, GIF · máx. 50 MB'}
+            {folder.type === 'videos' && 'MP4, MOV, WEBM · máx. 50 MB'}
+            {folder.type === 'apk' && 'Archivos APK · máx. 50 MB'}
+          </p>
+        </div>
 
         <AnimatePresence>
           {uploadProgress && (
